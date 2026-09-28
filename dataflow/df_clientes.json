@@ -12,7 +12,15 @@
 					"name": "source1"
 				}
 			],
-			"sinks": [],
+			"sinks": [
+				{
+					"dataset": {
+						"referenceName": "clientes_sql",
+						"type": "DatasetReference"
+					},
+					"name": "sink1"
+				}
+			],
 			"transformations": [
 				{
 					"name": "derivedColumn1"
@@ -39,11 +47,44 @@
 				"     ignoreNoFilesFound: false) ~> source1",
 				"source1 derive(nombre = initCap(lower(trim(nombre))),",
 				"          ciudad = iif(trim(ciudad) == 'SCZ', 'Santa Cruz de la Sierra', initCap(trim(nombre))),",
-				"          email = initCap(lower(trim(email)))) ~> derivedColumn1",
+				"          email = iif(isNull(email) || length(trim(email)) <= 5 || !like(email, '%@%'), 'sin_correo@empresa.com', trim(email))) ~> derivedColumn1",
 				"derivedColumn1 split(!isNull(cliente_id) && trim(cliente_id) != '',",
-				"     disjoint: false) ~> split1@(, )",
-				"split1 aggregate(groupBy(cliente_id),",
-				"     cliente_id = ERROR_FUNCTION('')) ~> aggregate1"
+				"     disjoint: false) ~> split1@(valido, rechazado)",
+				"split1@valido aggregate(groupBy(cliente_id),",
+				"     nombre = first(nombre),",
+				"          email = first(email),",
+				"          telefono = first(telefono),",
+				"          ciudad = first(ciudad),",
+				"          fecha_registro = first(fecha_registro),",
+				"          segmento = first(segmento)) ~> aggregate1",
+				"aggregate1 sink(allowSchemaDrift: true,",
+				"     validateSchema: false,",
+				"     input(",
+				"          cliente_id as string,",
+				"          nombre as string,",
+				"          email as string,",
+				"          telefono as string,",
+				"          ciudad as string,",
+				"          fecha_registro as date,",
+				"          segmento as string",
+				"     ),",
+				"     deletable:false,",
+				"     insertable:true,",
+				"     updateable:false,",
+				"     upsertable:false,",
+				"     format: 'table',",
+				"     skipDuplicateMapInputs: true,",
+				"     skipDuplicateMapOutputs: true,",
+				"     errorHandlingOption: 'stopOnFirstError',",
+				"     mapColumn(",
+				"          cliente_id,",
+				"          nombre,",
+				"          email,",
+				"          telefono,",
+				"          ciudad,",
+				"          fecha_registro,",
+				"          segmento",
+				"     )) ~> sink1"
 			]
 		}
 	}
